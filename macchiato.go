@@ -65,13 +65,13 @@ func NewCache(config *Config) (*Cache, error) {
         clientOptions := options.Client().ApplyURI(os.Getenv("MONGO_URI"))
         cache.client, err = mongo.Connect(context.TODO(), clientOptions)
         if err != nil {
-		return Cache{}, err
+		return &Cache{}, err
         }
 
 	//We will test now the DB
         err = cache.client.Ping(context.TODO(), nil)
         if err != nil {
-		return Cache{}, err
+		return &Cache{}, err
         }
 
 	//Now we will set the collection
