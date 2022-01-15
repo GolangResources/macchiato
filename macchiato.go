@@ -7,7 +7,6 @@ import (
 	"strings"
 	"context"
 	"reflect"
-	"encoding/base64"
 	"encoding/gob"
         "go.mongodb.org/mongo-driver/bson"
         "go.mongodb.org/mongo-driver/mongo"
@@ -31,7 +30,7 @@ type CacheCast struct {
 
 type CacheDB struct {
         ID string `bson:"id"`
-        Content string `bson:"content"`
+        Content []byte `bson:"content"`
         Type string `bson:"type"`
 }
 
@@ -69,7 +68,6 @@ func NewCache(config *Config) (Cache, error) {
 		return Cache{}, err
         }
 
-        //defer client.Disconnect(context.TODO())
 	//We will test now the DB
         err = cache.client.Ping(context.TODO(), nil)
         if err != nil {
@@ -80,6 +78,12 @@ func NewCache(config *Config) (Cache, error) {
         cache.collection = cache.client.Database(database).Collection(collection)
 
 	return cache, nil
+}
+
+func (c Cache) Disconnect() error {
+	err := c.client.Disconnect(context.TODO())
+
+	return err
 }
 
 func (c *Cache) Get(s string) (interface{}, bool) {
@@ -99,12 +103,7 @@ func (c *Cache) Get(s string) (interface{}, bool) {
         if (resultDB.ID != "") {
                 found = true
 
-                by, err := base64.StdEncoding.DecodeString(resultDB.Content)
-                if err != nil {
-			return nil, false
-                }
-
-                b.Write(by)
+                b.Write(resultDB.Content)
                 d := gob.NewDecoder(&b)
 
 		var resultTmp CacheCast
@@ -134,7 +133,7 @@ func (c *Cache) Set(s string, i interface{}, n int) (error) {
 
         resultDB.ID = s
         resultDB.Type = reflect.TypeOf(i).String()
-        resultDB.Content = base64.StdEncoding.EncodeToString(b.Bytes())
+	resultDB.Content = b.Bytes()
 
         upFilter := bson.M{
                 "$and": bson.A{
