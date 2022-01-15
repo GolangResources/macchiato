@@ -34,7 +34,7 @@ type CacheDB struct {
         Type string `bson:"type"`
 }
 
-func NewCache(config *Config) (Cache, error) {
+func NewCache(config *Config) (*Cache, error) {
 	var err error
 	var database string
 	var collection string
