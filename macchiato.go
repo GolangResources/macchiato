@@ -77,10 +77,10 @@ func NewCache(config *Config) (Cache, error) {
 	//Now we will set the collection
         cache.collection = cache.client.Database(database).Collection(collection)
 
-	return cache, nil
+	return &cache, nil
 }
 
-func (c Cache) Disconnect() error {
+func (c *Cache) Disconnect() error {
 	err := c.client.Disconnect(context.TODO())
 
 	return err
