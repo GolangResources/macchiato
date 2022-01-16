@@ -2,6 +2,7 @@ package macchiato
 
 import (
 	"os"
+	"log"
 	"bytes"
 	"errors"
 	"strings"
@@ -16,6 +17,7 @@ import (
 type Cache struct {
 	client *mongo.Client
 	collection *mongo.Collection
+	Gob string
 }
 
 type Config struct {
@@ -32,6 +34,10 @@ type CacheDB struct {
         ID string `bson:"id"`
         Content []byte `bson:"content"`
         Type string `bson:"type"`
+}
+
+func (c *Cache) Register(i interface{}) {
+	gob.Register(i)
 }
 
 func NewCache(config *Config) (*Cache, error) {
@@ -86,6 +92,27 @@ func (c *Cache) Disconnect() error {
 	return err
 }
 
+func (c *Cache) RawGet(s string) ([]byte, bool) {
+        var found bool
+        var err error
+        var result []byte
+        var resultDB CacheDB
+
+        err = c.collection.FindOne(context.TODO(), bson.M{ "id": s }).Decode(&resultDB)
+        if err != nil {
+                if ! (strings.Contains(err.Error(), "no documents")) {
+			return nil, false
+                }
+        }
+
+        if (resultDB.ID != "") {
+                found = true
+		result = resultDB.Content
+        }
+
+        return result, found
+}
+
 func (c *Cache) Get(s string) (interface{}, bool) {
         var found bool
         var err error
@@ -110,6 +137,7 @@ func (c *Cache) Get(s string) (interface{}, bool) {
 
 		err = d.Decode(&resultTmp)
                 if err != nil {
+			log.Println("ERROR", err)
 			return nil, false
                 }
 
@@ -117,6 +145,32 @@ func (c *Cache) Get(s string) (interface{}, bool) {
         }
 
         return result, found
+}
+
+func (c *Cache) RawSet(s string, i []byte, n int) (error) {
+        var resultDB CacheDB
+        var err error
+
+        resultDB.ID = s
+	resultDB.Content = i
+
+        upFilter := bson.M{
+                "$and": bson.A{
+                        bson.M{
+                                "id": bson.M{
+                                        "$eq": resultDB.ID,
+                                },
+                        },
+                },
+        }
+
+        upMsg := bson.M{
+                "$set": resultDB,
+        }
+
+        _, err = c.collection.UpdateMany(context.TODO(), upFilter, upMsg, options.Update().SetUpsert(true))
+
+        return err
 }
 
 func (c *Cache) Set(s string, i interface{}, n int) (error) {
